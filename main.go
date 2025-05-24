@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"flag"
-	"time"
+	"fmt"
+	"os"
 
 	"github.com/gboncoffee/hearts/koro"
 )
@@ -29,9 +31,16 @@ func main() {
 		panic(err)
 	}
 
-	k.AssignNames(username, dealer)
+	if dealer {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Press enter to start...")
+		reader.ReadString('\n')
+	}
 
-	time.Sleep(time.Second * 2)
+	peers := k.AssignNames(username, dealer)
+	for h, p := range peers {
+		fmt.Printf("Address: %v %v\n", h, p)
+	}
 
 	k.Fini()
 }

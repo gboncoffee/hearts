@@ -1,5 +1,7 @@
 package koro
 
+import "fmt"
+
 type Address uint8
 type sequency uint8
 
@@ -71,9 +73,7 @@ func (k *KoroContext) Send(msg Message, dest Address) {
 	msg.setOrigin(k.addr)
 	msg.setDestination(dest)
 	k.send(msg)
-	if k.get() != msg {
-		panic("network ack error")
-	}
+	k.get()
 }
 
 func (k *KoroContext) Yield() {
@@ -82,24 +82,29 @@ func (k *KoroContext) Yield() {
 
 func (k *KoroContext) AssignNames(username string, dealer bool) map[Address]string {
 	k.addr = username2address(username)
+	k.names = make(map[Address]string)
 
 	rightToSpeak := dealer
 
-	for len(k.names) < 4 {
+	for {
 		if rightToSpeak {
 			k.Send(&UsernameMessage{username: username}, 0)
 			k.names[k.addr] = username
 			k.Yield()
 		}
 
+		if len(k.names) == 4 {
+			return k.names
+		}
+
 		var msg Message
 		msg, rightToSpeak = k.Get()
-		if m, ok := msg.(*UsernameMessage); ok {
-			k.names[username2address(m.username)] = m.username
-		} else {
-			panic("error assigning names")
+		if msg != nil {
+			if m, ok := msg.(*UsernameMessage); ok {
+				k.names[username2address(m.username)] = m.username
+			} else {
+				panic(fmt.Errorf("got %v when assign names", msg))
+			}
 		}
 	}
-
-	return nil
 }
