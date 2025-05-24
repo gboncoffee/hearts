@@ -1,12 +1,21 @@
-package main
+package koro
 
-import "net"
+import (
+	"net"
+	"time"
+)
 
 const PORT = 42069
+const TIMEOUT = time.Second * 2
 
 type connection struct {
 	peerConn *net.UDPConn
 	conn     *net.UDPConn
+	bufSize  int
+}
+
+func (c *connection) init(bufSize int) {
+	c.bufSize = bufSize
 }
 
 func (c *connection) connectToPeer(addr string, port int) error {
@@ -47,8 +56,9 @@ func (c *connection) send(msg []byte) {
 	c.peerConn.Write(msg)
 }
 
-func (c *connection) read() []byte {
-	buffer := make([]byte, 1024)
-	n, _, _ := c.conn.ReadFromUDP(buffer)
-	return buffer[:n]
+func (c *connection) read() ([]byte, error) {
+	buffer := make([]byte, c.bufSize)
+	c.conn.SetDeadline(time.Now().Add(TIMEOUT))
+	n, _, err := c.conn.ReadFromUDP(buffer)
+	return buffer[:n], err
 }

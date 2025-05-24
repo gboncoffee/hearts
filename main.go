@@ -1,40 +1,37 @@
 package main
 
 import (
-	"bufio"
 	"flag"
-	"fmt"
-	"os"
+	"time"
+
+	"github.com/gboncoffee/hearts/koro"
 )
 
 func main() {
-	var conn connection
-	var serverMode bool
-	var port int
-	var peerPort int
+	var k koro.KoroContext
 
-	flag.BoolVar(&serverMode, "serverMode", false, "set's server mode")
-	flag.IntVar(&port, "port", PORT, "override default port")
-	flag.IntVar(&peerPort, "peerPort", PORT, "override default peer port")
+	var dealer bool
+	var peerAddress string
+	var username string
+	var peerPort int
+	var localPort int
+
+	flag.BoolVar(&dealer, "dealer", false, "dealer mode")
+	flag.StringVar(&peerAddress, "pa", "localhost", "peer address")
+	flag.StringVar(&username, "u", "", "username")
+	flag.IntVar(&peerPort, "pp", koro.PORT, "peer port")
+	flag.IntVar(&localPort, "lp", koro.PORT, "local port")
+
 	flag.Parse()
 
-	conn.listen(port)
-
-	reader := bufio.NewScanner(os.Stdin)
-	fmt.Print("enter peer address: ")
-	reader.Scan()
-	addr := reader.Text()
-
-	conn.connectToPeer(addr, peerPort)
-
-	if serverMode {
-		for {
-			msg := conn.read()
-			fmt.Printf("received message: %s\n", string(msg))
-		}
-	} else {
-		for {
-			conn.send([]byte("Hello, World!"))
-		}
+	err := k.Init("localhost", peerPort, localPort)
+	if err != nil {
+		panic(err)
 	}
+
+	k.AssignNames(username, dealer)
+
+	time.Sleep(time.Second * 2)
+
+	k.Fini()
 }
