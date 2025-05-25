@@ -47,12 +47,12 @@ type UsernameMessage struct {
 
 type YourCardsMessage struct {
 	commonMessage
-	cards [13]Card
+	Cards [13]byte
 }
 
 type PlayMessage struct {
 	commonMessage
-	card Card
+	card byte
 }
 
 type tokenPassMessage struct {
@@ -76,13 +76,13 @@ func parse(buffer []byte) Message {
 	case your_cards_message:
 		msg := YourCardsMessage{commonMessage: cm}
 		for i, c := range buffer[3 : 3+13] {
-			msg.cards[i] = Card(c)
+			msg.Cards[i] = byte(c)
 		}
 		return &msg
 	case play_message:
 		return &PlayMessage{
 			commonMessage: cm,
-			card:          Card(buffer[3]),
+			card:          buffer[3],
 		}
 	case token_pass_message:
 		return &tokenPassMessage{
@@ -103,8 +103,8 @@ func serialize(msg Message) []byte {
 		data = append(data, []byte(m.username)...)
 	case *YourCardsMessage:
 		tipe = your_cards_message
-		data = make([]byte, len(m.cards))
-		for i, c := range m.cards {
+		data = make([]byte, len(m.Cards))
+		for i, c := range m.Cards {
 			data[i] = byte(c)
 		}
 	case *PlayMessage:

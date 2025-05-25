@@ -30,6 +30,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer k.Fini()
 
 	if dealer {
 		reader := bufio.NewReader(os.Stdin)
@@ -38,9 +39,26 @@ func main() {
 	}
 
 	peers := k.AssignNames(username, dealer)
-	for h, p := range peers {
-		fmt.Printf("Address: %v %v\n", h, p)
+	fmt.Println("Game starting!")
+	fmt.Print("Players connected:")
+	for _, p := range peers {
+		fmt.Printf(" %v", p)
 	}
+	fmt.Println()
 
-	k.Fini()
+	var cards *[13]card
+
+	if dealer {
+		addrs := [4]koro.Address{}
+		i := 0
+		for a := range peers {
+			addrs[i] = a
+			i++
+		}
+
+		cards = deal(&k, addrs)
+		startGameAsDealer(&k, cards)
+	} else {
+		waitDealAndStartGame(&k)
+	}
 }

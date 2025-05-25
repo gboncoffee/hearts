@@ -32,6 +32,10 @@ func (k *KoroContext) Fini() {
 	k.conn.close()
 }
 
+func (k *KoroContext) Address() Address {
+	return k.addr
+}
+
 func username2address(name string) Address {
 	hash := uint8(0)
 	for _, b := range []uint8(name) {
