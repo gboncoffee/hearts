@@ -51,8 +51,11 @@ func main() {
 	game.points = make(map[koro.Address]int)
 	game.dealer = dealer
 
+	i := 0
 	for a := range peers {
 		game.points[a] = 0
+		game.order[i] = a
+		i++
 	}
 
 	game.start(&k, dealer)
