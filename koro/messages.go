@@ -13,7 +13,7 @@ const (
 )
 
 type Message interface {
-	origin() Address
+	Origin() Address
 	destination() Address
 	setOrigin(Address)
 	setDestination(Address)
@@ -28,7 +28,7 @@ func (c *commonMessage) destination() Address {
 	return c.dest
 }
 
-func (c *commonMessage) origin() Address {
+func (c *commonMessage) Origin() Address {
 	return c.orig
 }
 
@@ -52,7 +52,7 @@ type YourCardsMessage struct {
 
 type PlayMessage struct {
 	commonMessage
-	card byte
+	Card byte
 }
 
 type tokenPassMessage struct {
@@ -82,7 +82,7 @@ func parse(buffer []byte) Message {
 	case play_message:
 		return &PlayMessage{
 			commonMessage: cm,
-			card:          buffer[3],
+			Card:          buffer[3],
 		}
 	case token_pass_message:
 		return &tokenPassMessage{
@@ -109,13 +109,13 @@ func serialize(msg Message) []byte {
 		}
 	case *PlayMessage:
 		tipe = play_message
-		data = []byte{byte(m.card)}
+		data = []byte{byte(m.Card)}
 	case *tokenPassMessage:
 		tipe = token_pass_message
 	}
 
 	bin := []byte{
-		byte(msg.origin()),
+		byte(msg.Origin()),
 		byte(msg.destination()),
 		byte(tipe),
 	}

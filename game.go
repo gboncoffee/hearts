@@ -1,8 +1,11 @@
 package main
 
 import (
-	"github.com/gboncoffee/hearts/koro"
+	"fmt"
 	"math/rand"
+	"slices"
+
+	"github.com/gboncoffee/hearts/koro"
 )
 
 type suit uint8
@@ -83,6 +86,12 @@ func getSuit(c card) suit {
 	return DIAMONDS
 }
 
+type gameState struct {
+	players map[koro.Address]string
+	points  map[koro.Address]int
+	dealer  bool
+}
+
 func deal(k *koro.KoroContext, players [4]koro.Address) *[13]card {
 	cards := [52]card{}
 	for i := range 52 {
@@ -118,10 +127,92 @@ func deal(k *koro.KoroContext, players [4]koro.Address) *[13]card {
 	return ourCards
 }
 
-func waitDealAndStartGame(k *koro.KoroContext) {
-	// TODO
+func waitDeal(k *koro.KoroContext) *[13]card {
+	for {
+		msg, _ := k.Get()
+		return (*[13]card)(msg.(*koro.YourCardsMessage).Cards)
+	}
 }
 
-func startGameAsDealer(k *koro.KoroContext, cards *[13]card) {
-	// TODO
+type rankEntry struct {
+	player string
+	points int
+}
+
+func (g *gameState) finish() *[4]rankEntry {
+	rank := new([4]rankEntry)
+	i := 0
+	someoneExploded := false
+	for player, points := range g.points {
+		entry := rankEntry{
+			player: g.players[player],
+			points: points,
+		}
+		rank[i] = entry
+		i++
+		if points >= 100 {
+			someoneExploded = true
+		}
+	}
+	if !someoneExploded {
+		return nil
+	}
+
+	slices.SortStableFunc(rank[:], func(a rankEntry, b rankEntry) int {
+		if a.points < b.points {
+			return -1
+		}
+		if a.points > b.points {
+			return 1
+		}
+		return 0
+	})
+
+	return rank
+}
+
+func (g *gameState) start(k *koro.KoroContext, dealer bool) {
+	rank := g.mainloop(k, dealer)
+	fmt.Println("End!")
+	fmt.Println("Ranking:")
+	for i, e := range rank {
+		fmt.Printf("%v. %-20s: %v", i, e.player, e.points)
+	}
+}
+
+func (g *gameState) mainloop(k *koro.KoroContext, dealer bool) *[4]rankEntry {
+	for {
+		g.round(k, dealer)
+		rank := g.finish()
+		if rank != nil {
+			return rank
+		}
+	}
+}
+
+type roundState struct {
+	hand   []card
+	points map[koro.Address]int
+	broke  bool
+}
+
+func (g *gameState) round(k *koro.KoroContext, dealer bool) {
+	var players [4]koro.Address
+	i := 0
+	for a := range g.players {
+		players[i] = a
+		i++
+	}
+
+	var cards *[13]card
+	if dealer {
+		cards = deal(k, players)
+	} else {
+		cards = waitDeal(k)
+	}
+
+	hand := cards[:]
+	for {
+		// TODO
+	}
 }

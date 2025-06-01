@@ -46,19 +46,14 @@ func main() {
 	}
 	fmt.Println()
 
-	var cards *[13]card
+	var game gameState
+	game.players = peers
+	game.points = make(map[koro.Address]int)
+	game.dealer = dealer
 
-	if dealer {
-		addrs := [4]koro.Address{}
-		i := 0
-		for a := range peers {
-			addrs[i] = a
-			i++
-		}
-
-		cards = deal(&k, addrs)
-		startGameAsDealer(&k, cards)
-	} else {
-		waitDealAndStartGame(&k)
+	for a := range peers {
+		game.points[a] = 0
 	}
+
+	game.start(&k, dealer)
 }
