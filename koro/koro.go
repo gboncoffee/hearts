@@ -6,14 +6,15 @@ type Address uint8
 type sequency uint8
 
 type KoroContext struct {
-	conn      connection
-	names     map[Address]string
-	outcoming chan Message
-	incoming  chan Message
-	addr      Address
+	conn         connection
+	names        map[Address]string
+	outcoming    chan Message
+	incoming     chan Message
+	addr         Address
+	rightToSpeak bool
 }
 
-func (k *KoroContext) Init(peerAddr string, peerPort int, localPort int) error {
+func (k *KoroContext) Init(peerAddr string, peerPort int, localPort int, rts bool) error {
 	k.conn.init(256)
 
 	err := k.conn.connectToPeer(peerAddr, peerPort)
@@ -24,6 +25,8 @@ func (k *KoroContext) Init(peerAddr string, peerPort int, localPort int) error {
 	if err != nil {
 		return err
 	}
+
+	k.rightToSpeak = rts
 
 	return nil
 }
@@ -50,20 +53,22 @@ func (k *KoroContext) get() Message {
 		panic(err)
 	}
 
-	return parse(buffer)
+	pmsg := parse(buffer)
+	return pmsg
 }
 
-func (k *KoroContext) Get() (Message, bool) {
+func (k *KoroContext) Get() Message {
 	for {
 		msg := k.get()
 		if _, isYield := msg.(*tokenPassMessage); isYield {
-			return nil, true
+			k.rightToSpeak = true
+			return nil
 		}
 
 		dest := msg.destination()
 		k.send(msg)
 		if dest == 0 || dest == k.addr {
-			return msg, false
+			return msg
 		}
 	}
 }
@@ -81,33 +86,46 @@ func (k *KoroContext) Send(msg Message, dest Address) {
 }
 
 func (k *KoroContext) Yield() {
+	if !k.rightToSpeak {
+		panic("Called yield without the right to speak.")
+	}
 	k.send(&tokenPassMessage{})
+	k.rightToSpeak = false
 }
 
-func (k *KoroContext) AssignNames(username string, dealer bool) map[Address]string {
+func (k *KoroContext) RightToSpeak() bool {
+	return k.rightToSpeak
+}
+
+func (k *KoroContext) AssignNames(username string, rightToSpeak bool) map[Address]string {
 	k.addr = username2address(username)
 	k.names = make(map[Address]string)
-
-	rightToSpeak := dealer
+	k.rightToSpeak = rightToSpeak
 
 	for {
-		if rightToSpeak {
+		if len(k.names) == 4 {
+			// If we did start with the rts, we should get it back.
+			if rightToSpeak {
+				for !k.RightToSpeak() {
+					k.Get()
+				}
+			}
+			return k.names
+		}
+		if k.RightToSpeak() {
 			k.Send(&UsernameMessage{username: username}, 0)
 			k.names[k.addr] = username
 			k.Yield()
-		}
-
-		if len(k.names) == 4 {
-			return k.names
+			continue
 		}
 
 		var msg Message
-		msg, rightToSpeak = k.Get()
+		msg = k.Get()
 		if msg != nil {
 			if m, ok := msg.(*UsernameMessage); ok {
 				k.names[username2address(m.username)] = m.username
 			} else {
-				panic(fmt.Errorf("got %v when assign names", msg))
+				panic(fmt.Errorf("got %T when assign names", msg))
 			}
 		}
 	}

@@ -26,7 +26,7 @@ func main() {
 
 	flag.Parse()
 
-	err := k.Init("localhost", peerPort, localPort)
+	err := k.Init("localhost", peerPort, localPort, dealer)
 	if err != nil {
 		panic(err)
 	}
@@ -39,12 +39,6 @@ func main() {
 	}
 
 	peers := k.AssignNames(username, dealer)
-	fmt.Println("Game starting!")
-	fmt.Print("Players connected:")
-	for _, p := range peers {
-		fmt.Printf(" %v", p)
-	}
-	fmt.Println()
 
 	var game gameState
 	game.players = peers

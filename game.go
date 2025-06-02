@@ -21,8 +21,7 @@ const (
 const UNDEFINED_SUIT = 0xff
 
 const (
-	SPADES_A = iota
-	SPADES_2
+	SPADES_2 = iota
 	SPADES_3
 	SPADES_4
 	SPADES_5
@@ -34,7 +33,7 @@ const (
 	SPADES_J
 	SPADES_Q
 	SPADES_K
-	HEARTS_A
+	SPADES_A
 	HEARTS_2
 	HEARTS_3
 	HEARTS_4
@@ -47,7 +46,7 @@ const (
 	HEARTS_J
 	HEARTS_Q
 	HEARTS_K
-	CLUBS_A
+	HEARTS_A
 	CLUBS_2
 	CLUBS_3
 	CLUBS_4
@@ -60,7 +59,7 @@ const (
 	CLUBS_J
 	CLUBS_Q
 	CLUBS_K
-	DIAMONDS_A
+	CLUBS_A
 	DIAMONDS_2
 	DIAMONDS_3
 	DIAMONDS_4
@@ -73,16 +72,17 @@ const (
 	DIAMONDS_J
 	DIAMONDS_Q
 	DIAMONDS_K
+	DIAMONDS_A
 )
 
 func getSuit(c card) suit {
-	if c < HEARTS_A {
+	if c < HEARTS_2 {
 		return SPADES
 	}
-	if c < CLUBS_A {
+	if c < CLUBS_2 {
 		return HEARTS
 	}
-	if c < DIAMONDS_A {
+	if c < DIAMONDS_2 {
 		return CLUBS
 	}
 	return DIAMONDS
@@ -221,15 +221,17 @@ func deal(k *koro.KoroContext, players [4]koro.Address) *[13]card {
 	we := k.Address()
 	ourCards := new([13]card)
 	for i, player := range players {
+		var playerCards *[13]card
 		msg := koro.YourCardsMessage{}
-		playerCards := &msg.Cards
 		if player == we {
 			playerCards = ourCards
+		} else {
+			playerCards = &msg.Cards
 		}
 
 		j := 0
 		for k := i * 13; k < (i+1)*13; k++ {
-			playerCards[j] = cards[i]
+			playerCards[j] = cards[k]
 			j++
 		}
 
@@ -243,7 +245,11 @@ func deal(k *koro.KoroContext, players [4]koro.Address) *[13]card {
 
 func waitDeal(k *koro.KoroContext) *[13]card {
 	for {
-		msg, _ := k.Get()
+		msg := k.Get()
+		if msg == nil {
+			k.Yield()
+			continue
+		}
 		return (&msg.(*koro.YourCardsMessage).Cards)
 	}
 }
@@ -286,12 +292,20 @@ func (g *gameState) finish() *[4]rankEntry {
 }
 
 func (g *gameState) start(k *koro.KoroContext, dealer bool) {
+	fmt.Println("Game starting!")
+	fmt.Print("Players connected:")
+	for _, a := range g.order[:3] {
+		fmt.Printf(" %v,", g.players[a])
+	}
+	fmt.Printf(" %v\n", g.players[g.order[3]])
+
 	rank := g.mainloop(k, dealer)
-	fmt.Println("End!")
+	fmt.Println("\nEnd!")
 	fmt.Println("Ranking:")
 	for i, e := range rank {
-		fmt.Printf("%v. %-20s: %v", i, e.player, e.points)
+		fmt.Printf("%v. %-20s %v", i, e.player, e.points)
 	}
+	fmt.Println()
 }
 
 func (g *gameState) mainloop(k *koro.KoroContext, dealer bool) *[4]rankEntry {
@@ -300,6 +314,13 @@ func (g *gameState) mainloop(k *koro.KoroContext, dealer bool) *[4]rankEntry {
 		rank := g.finish()
 		if rank != nil {
 			return rank
+		}
+		if !dealer && k.RightToSpeak() {
+			k.Yield()
+		} else if dealer {
+			for !k.RightToSpeak() {
+				k.Get()
+			}
 		}
 	}
 }
@@ -323,7 +344,7 @@ func (g *gameState) round(k *koro.KoroContext, dealer bool) {
 		cards = waitDeal(k)
 	}
 
-	fmt.Println("Round starting!")
+	fmt.Println("\nRound starting!")
 	fmt.Println("Your hand:")
 	for _, c := range cards {
 		fmt.Printf("%v ", card2string(c))
@@ -340,18 +361,35 @@ func (g *gameState) round(k *koro.KoroContext, dealer bool) {
 		round.points[a] = 0
 	}
 
-	rightToSpeak := dealer
-	start := slices.Index(cards[:], CLUBS_2) != -1
+	clubs2idx := slices.Index(cards[:], CLUBS_2)
+	start := clubs2idx != -1
+	startingRound := start
 
-	// Actually play the round.
 	for len(round.hand) > 0 {
-		start, rightToSpeak, round.broke = g.trick(
+		start = g.trick(
 			k,
 			&round,
 			start,
-			rightToSpeak,
-			round.broke,
+			startingRound,
 		)
+		startingRound = false
+		fmt.Println("\nPoints:")
+		for _, a := range g.order {
+			fmt.Printf("%-20s %v\n", g.players[a], round.points[a])
+		}
+		fmt.Println()
+	}
+
+	for a, p := range round.points {
+		if p == 26 {
+			for an := range round.points {
+				if an == a {
+					round.points[an] = 0
+				} else {
+					round.points[an] = 26
+				}
+			}
+		}
 	}
 
 	for a := range g.points {
@@ -363,54 +401,58 @@ func (g *gameState) trick(
 	k *koro.KoroContext,
 	round *roundState,
 	start bool,
-	rightToSpeak bool,
-	broke bool,
-) (bool, bool, bool) {
+	startingRound bool,
+) (won bool) {
 	trick := trickState{
 		table: make(map[koro.Address]card),
 		suit:  suit(UNDEFINED_SUIT),
 	}
 
 	if start {
-		for !rightToSpeak {
-			_, rightToSpeak = k.Get()
+		for !k.RightToSpeak() {
+			k.Get()
 		}
-		shouldBreak := g.play(k, round, &trick, broke, true)
-		if !broke {
-			broke = shouldBreak
+		shouldBreak := g.play(k, round, &trick, true, startingRound)
+		if !round.broke {
+			round.broke = shouldBreak
 		}
-	} else if rightToSpeak {
+		k.Yield()
+	} else if k.RightToSpeak() {
 		k.Yield()
 	}
 
-	ourTime := false
 	var msg koro.Message
 	for len(trick.table) != 4 {
-		if ourTime {
-			shouldBreak := g.play(k, round, &trick, broke, false)
-			if !broke {
-				broke = shouldBreak
+		msg = k.Get()
+		if k.RightToSpeak() {
+			if len(trick.table) == 0 {
+				k.Yield()
+				continue
+			}
+			shouldBreak := g.play(k, round, &trick, false, false)
+			if !round.broke {
+				round.broke = shouldBreak
 			}
 			k.Yield()
-			continue
-		}
-
-		msg, ourTime = k.Get()
-		if ourTime && len(trick.table) == 0 {
-			k.Yield()
-			ourTime = false
 			continue
 		}
 
 		card := card(msg.(*koro.PlayMessage).Card)
 		trick.table[msg.Origin()] = card
-		if trick.suit == UNDEFINED_SUIT {
-			suit := getSuit(card)
-			if !broke {
-				broke = suit == HEARTS
-			}
 
+		suit := getSuit(card)
+		if !round.broke {
+			round.broke = suit == HEARTS
+		}
+
+		if trick.suit == UNDEFINED_SUIT {
 			trick.suit = suit
+		}
+		fmt.Println("\nTable:")
+		for _, a := range g.order {
+			if c, ok := trick.table[a]; ok {
+				fmt.Printf("%-20s %v\n", g.players[a], card2string(c))
+			}
 		}
 	}
 
@@ -433,34 +475,44 @@ func (g *gameState) trick(
 	}
 
 	round.points[winner] += points
+	fmt.Printf("\nTrick winner: %v with %v points.\n", g.players[winner], points)
 
-	return winner == k.Address(), ourTime, broke
+	return winner == k.Address()
 }
 
 func (g *gameState) play(
 	k *koro.KoroContext,
 	round *roundState,
 	trick *trickState,
-	broke bool,
 	first bool,
-) bool {
-	allowed := getAllowedCards(trick.suit, round.hand, broke, first)
+	startingRound bool,
+) (shouldBreak bool) {
+	if startingRound {
+		fmt.Println("\nYou're starting with the 2 of Clubs.")
+		idx := slices.Index(round.hand, CLUBS_2)
+		round.hand = slices.Delete(round.hand, idx, idx+1)
+		k.Send(&koro.PlayMessage{Card: CLUBS_2}, 0)
+		trick.table[k.Address()] = CLUBS_2
+		trick.suit = CLUBS
+		return false
+	}
 
-	fmt.Println("Your time!")
+	allowed := getAllowedCards(trick.suit, round.hand, round.broke, first)
+
+	fmt.Println("\nYour time!")
 	fmt.Println("Your entire hand: ")
 	for _, c := range round.hand {
 		fmt.Printf("%v ", card2string(c))
 	}
-	fmt.Println()
-	fmt.Println("You're allowed to play:")
+	fmt.Println("\nYou're allowed to play:")
 	for i, c := range allowed {
-		fmt.Printf("%v - %v \n", i, c)
+		fmt.Printf("%v - %v \n", i+1, card2string(c))
 	}
 	fmt.Print("Choose a card to play: ")
 	var n int
 	fmt.Scanf("%d", &n)
 
-	for n > 0 && n <= len(allowed) {
+	for n < 1 || n > len(allowed) {
 		fmt.Printf("\nChoose a number between 1 and %v: ", len(allowed))
 		fmt.Scanf("%d", &n)
 	}
@@ -469,7 +521,6 @@ func (g *gameState) play(
 	idx := slices.Index(round.hand, card)
 	round.hand = slices.Delete(round.hand, idx, idx+1)
 	k.Send(&koro.PlayMessage{Card: card}, 0)
-	k.Yield()
 	trick.table[k.Address()] = card
 	suit := getSuit(card)
 	if first {
