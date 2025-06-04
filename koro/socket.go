@@ -17,9 +17,17 @@ func (c *connection) init(bufSize int) {
 }
 
 func (c *connection) connectToPeer(addr string, port int) error {
+	var ip net.IP
+	ips, err := net.LookupIP(addr)
+	if err != nil {
+		ip = net.ParseIP(addr)
+	} else {
+		ip = ips[0]
+	}
+
 	peerAddr := net.UDPAddr{
 		Port: port,
-		IP:   net.ParseIP(addr),
+		IP:   ip,
 	}
 
 	conn, err := net.DialUDP("udp", nil, &peerAddr)
