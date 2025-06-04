@@ -394,13 +394,13 @@ func (g *gameState) round(k *koro.KoroContext, dealer bool) {
 		}
 	}
 
-	fmt.Println("\nLive points:")
-	for _, a := range g.order {
-		fmt.Printf("%-20s %v\n", g.players[a], round.points[a])
-	}
-
 	for a := range g.points {
 		g.points[a] += round.points[a]
+	}
+
+	fmt.Println("\nLive points:")
+	for _, a := range g.order {
+		fmt.Printf("%-20s %v\n", g.players[a], g.points[a])
 	}
 }
 
