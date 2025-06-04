@@ -26,7 +26,7 @@ func main() {
 
 	flag.Parse()
 
-	err := k.Init("localhost", peerPort, localPort, dealer)
+	err := k.Init(peerAddress, peerPort, localPort, dealer)
 	if err != nil {
 		panic(err)
 	}

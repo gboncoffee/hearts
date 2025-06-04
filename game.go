@@ -382,6 +382,7 @@ func (g *gameState) round(k *koro.KoroContext, dealer bool) {
 
 	for a, p := range round.points {
 		if p == 26 {
+			fmt.Printf("\n%v shoot the Moon!\n", g.players[a])
 			for an := range round.points {
 				if an == a {
 					round.points[an] = 0
@@ -389,7 +390,13 @@ func (g *gameState) round(k *koro.KoroContext, dealer bool) {
 					round.points[an] = 26
 				}
 			}
+			break
 		}
+	}
+
+	fmt.Println("\nLive points:")
+	for _, a := range g.order {
+		fmt.Printf("%-20s %v\n", g.players[a], round.points[a])
 	}
 
 	for a := range g.points {
