@@ -200,10 +200,11 @@ func card2string(c card) string {
 }
 
 type gameState struct {
-	order   [4]koro.Address
-	players map[koro.Address]string
-	points  map[koro.Address]int
-	dealer  bool
+	order    [4]koro.Address
+	players  map[koro.Address]string
+	points   map[koro.Address]int
+	dealer   bool
+	testMode bool
 }
 
 func deal(k *koro.KoroContext, players [4]koro.Address) *[13]card {
@@ -303,7 +304,7 @@ func (g *gameState) start(k *koro.KoroContext, dealer bool) {
 	fmt.Println("\nEnd!")
 	fmt.Println("Ranking:")
 	for i, e := range rank {
-		fmt.Printf("%v. %-20s %v", i, e.player, e.points)
+		fmt.Printf("%v. %-20s %v\n", i, e.player, e.points)
 	}
 	fmt.Println()
 }
@@ -515,13 +516,20 @@ func (g *gameState) play(
 	for i, c := range allowed {
 		fmt.Printf("%v - %v \n", i+1, card2string(c))
 	}
-	fmt.Print("Choose a card to play: ")
-	var n int
-	fmt.Scanf("%d", &n)
 
-	for n < 1 || n > len(allowed) {
-		fmt.Printf("\nChoose a number between 1 and %v: ", len(allowed))
+	var n int
+
+	if !g.testMode {
+		fmt.Print("Choose a card to play: ")
 		fmt.Scanf("%d", &n)
+		for n < 1 || n > len(allowed) {
+			fmt.Printf("\nChoose a number between 1 and %v: ", len(allowed))
+			fmt.Scanf("%d", &n)
+		}
+	} else {
+		// Autoplay.
+		fmt.Printf("\nAutoplaying %s\n", card2string(allowed[0]))
+		n = 1
 	}
 
 	card := allowed[n-1]

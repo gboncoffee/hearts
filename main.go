@@ -17,12 +17,14 @@ func main() {
 	var username string
 	var peerPort int
 	var localPort int
+	var testMode bool
 
 	flag.BoolVar(&dealer, "dealer", false, "dealer mode")
 	flag.StringVar(&peerAddress, "pa", "localhost", "peer address")
 	flag.StringVar(&username, "u", "", "username")
 	flag.IntVar(&peerPort, "pp", koro.PORT, "peer port")
 	flag.IntVar(&localPort, "lp", koro.PORT, "local port")
+	flag.BoolVar(&testMode, "test", false, "test mode (autoplay)")
 
 	flag.Parse()
 
@@ -44,6 +46,7 @@ func main() {
 	game.players = peers
 	game.points = make(map[koro.Address]int)
 	game.dealer = dealer
+	game.testMode = testMode
 
 	i := 0
 	for a := range peers {
